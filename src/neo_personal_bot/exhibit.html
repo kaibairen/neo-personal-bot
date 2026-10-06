@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>neo-personal-bot</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1c1915;
+      --muted: #5c564c;
+      --line: #e4dccf;
+      --paper: #f6f1e8;
+      --card: #fffdf8;
+      --accent: #8c3d2a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "Songti SC", serif;
+      background: var(--paper);
+      color: var(--ink);
+    }
+    main { max-width: 42rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+    h1 { font-size: 2rem; font-weight: 600; margin: 0 0 0.4rem; }
+    p { line-height: 1.55; }
+    .muted { color: var(--muted); }
+    form { display: grid; gap: 0.75rem; margin: 1.5rem 0; }
+    textarea {
+      width: 100%;
+      min-height: 6.5rem;
+      padding: 0.8rem;
+      border: 1px solid var(--line);
+      background: var(--card);
+      color: inherit;
+      font: inherit;
+      resize: vertical;
+    }
+    button, .samples button {
+      font: inherit;
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: #fffdf8;
+      padding: 0.45rem 0.9rem;
+      cursor: pointer;
+    }
+    .samples { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .samples button { background: transparent; color: var(--accent); }
+    article {
+      border: 1px solid var(--line);
+      background: var(--card);
+      padding: 1rem 1.1rem;
+      min-height: 8rem;
+    }
+    dl { display: grid; grid-template-columns: 4.5rem 1fr; gap: 0.35rem 0.75rem; margin: 0; }
+    dt { color: var(--muted); }
+    dd { margin: 0; }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>neo-personal-bot</h1>
+    <p class="muted">个人化的可自定义工作团队。点名一个角色，需要改仓库时才会派给 neo cloud agent。默认走本地录像，不连真云。</p>
+    <div class="samples">
+      <button type="button" data-text="@工程师 在 neo-personal-bot 里给 README 加上一行产品一句话，并开 PR">工程师开 PR</button>
+      <button type="button" data-text="@工程师 给客户发送这封邮件">发送需审批</button>
+      <button type="button" data-text="@研究员 我们团队有哪些人">研究员只回复</button>
+    </div>
+    <form id="composer">
+      <label for="text">给团队的一句话</label>
+      <textarea id="text" name="text">@工程师 在 neo-personal-bot 里给 README 加上一行产品一句话，并开 PR</textarea>
+      <button type="submit">发送</button>
+    </form>
+    <article id="card" aria-live="polite">
+      <p class="muted">卡片会显示角色、状态、分支、PR 和错误。</p>
+    </article>
+  </main>
+  <script>
+    const text = document.querySelector("#text");
+    const card = document.querySelector("#card");
+    for (const button of document.querySelectorAll("[data-text]")) {
+      button.addEventListener("click", () => { text.value = button.dataset.text; });
+    }
+    function line(label, value) {
+      const term = document.createElement("dt");
+      term.textContent = label;
+      const detail = document.createElement("dd");
+      detail.textContent = value || "—";
+      return [term, detail];
+    }
+    document.querySelector("#composer").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const response = await fetch("/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text.value })
+      });
+      const body = await response.json();
+      card.replaceChildren();
+      const list = document.createElement("dl");
+      list.append(...line("角色", body.role_name), ...line("状态", body.status_label || body.status), ...line("分支", body.branch));
+      const term = document.createElement("dt");
+      term.textContent = "PR";
+      const detail = document.createElement("dd");
+      if (body.pr_url) {
+        const link = document.createElement("a");
+        link.href = body.pr_url;
+        link.textContent = body.pr_url;
+        detail.append(link);
+      } else {
+        detail.textContent = "—";
+      }
+      list.append(term, detail, ...line("错误", body.error));
+      const summary = document.createElement("p");
+      summary.textContent = body.summary || "";
+      card.append(list, summary);
+    });
+  </script>
+</body>
+</html>
